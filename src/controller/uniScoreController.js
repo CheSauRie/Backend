@@ -1,5 +1,6 @@
 const { UniversityScore } = require('../models');
 const { Sequelize } = require('sequelize');
+
 const getMajorsByUniversityCode = async (req, res) => {
     const { uniCode } = req.params;
     const { year } = req.query;
@@ -11,15 +12,7 @@ const getMajorsByUniversityCode = async (req, res) => {
         }
 
         const majors = await UniversityScore.findAll({
-            attributes: [
-                [Sequelize.fn('MIN', Sequelize.col('uni_code')), 'uni_code'],
-                [Sequelize.fn('MIN', Sequelize.col('uni_name')), 'uni_name'],
-                'major_code',
-                [Sequelize.fn('MIN', Sequelize.col('major_name')), 'major_name'],
-                [Sequelize.fn('MIN', Sequelize.col('subject_group')), 'subject_group'],
-                [Sequelize.fn('MAX', Sequelize.col('admission_score')), 'admission_score'],
-                [Sequelize.fn('MAX', Sequelize.col('year')), 'year'],
-            ],
+            attributes: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year'],
             where: whereClause,
             group: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year']
         });
@@ -37,7 +30,7 @@ const getAllUniversityNames = async (req, res) => {
             group: ['uni_code', 'uni_name'], // Nhóm kết quả theo uni_code và uni_name
             raw: true // Trả về kết quả dưới dạng JSON thô, không có đối tượng Sequelize
         });
-        res.json(universities);
+        res.status(200).json(universities);
     } catch (error) {
         console.error("Error fetching all university names:", error);
         res.status(500).json({ message: "Failed to fetch all university names", error: error.message });
@@ -66,7 +59,7 @@ const getScoresByMajorCodeAndUniversityCode = async (req, res) => {
             return result;
         }, {});
 
-        res.json(groupedScores);
+        res.status(200).json(groupedScores);
     } catch (error) {
         console.error("Error fetching scores by major code and university code:", error);
         res.status(500).json({ message: "Failed to fetch scores by major code and university code", error: error.message });
