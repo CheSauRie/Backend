@@ -7,16 +7,12 @@ const getMajorsByUniversityCode = async (req, res) => {
     try {
         const majors = await UniversityScore.sequelize.query(`
             SELECT DISTINCT ON (major_code) *
-            FROM UniversityScores
-            WHERE uni_code = :uniCode
+            FROM "UniversityScores"
+            WHERE uni_code = '${uniCode}'
             ORDER BY major_code, year DESC
-        `, {
-            replacements: { uniCode },
-            model: UniversityScore,
-            mapToModel: true // Makes the results formatted as if they were created with UniversityScore.findAll()
-        });
+        `);
 
-        res.json(majors);
+        res.status(200).json(majors);
     } catch (error) {
         console.error("Error fetching majors by university code:", error);
         res.status(500).json({ message: "Failed to fetch majors by university code", error: error.message });
