@@ -22,11 +22,11 @@ module.exports = {
     await queryInterface.removeColumn('Reviews', 'content');
     await queryInterface.addColumn('Reviews', 'cons', {
       type: Sequelize.TEXT,
-      allowNull: true, // Adjust based on your actual schema requirements
+      allowNull: true,
     });
     await queryInterface.addColumn('Reviews', 'pros', {
       type: Sequelize.TEXT,
-      allowNull: true, // Adjust based on your actual schema requirements
+      allowNull: true,
     });
   }
 };
