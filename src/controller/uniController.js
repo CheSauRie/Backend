@@ -1,5 +1,6 @@
 const { University, MarkdownUni, Major } = require('../models');
 const { Sequelize } = require('sequelize');
+const { replaceEscapedNewlines } = require('../ultis/replaceEscapedNewlines');
 require('dotenv').config()
 const cloudinary = require('cloudinary').v2;
 
@@ -100,10 +101,9 @@ const getUniversityImages = async (req, res) => {
 // Chi tiết university
 const getUniversityDetail = async (req, res) => {
     try {
-        const { uni_code } = req.params; // Sử dụng tên hoặc một định danh khác để tìm trường đại học
-        // Tìm thông tin trường đại học từ bảng universities
+        const { uni_code } = req.params;
         const university = await University.findOne({
-            where: { uni_code }, // Hoặc sử dụng một trường định danh phù hợp
+            where: { uni_code },
         });
 
         if (!university) {
@@ -121,7 +121,9 @@ const getUniversityDetail = async (req, res) => {
             ...university.dataValues,
             ...markdownDetails.dataValues
         };
-
+        for (let key in universityDetail) {
+            universityDetail[key] = replaceEscapedNewlines(universityDetail[key]);
+        }
         res.json(universityDetail);
     } catch (error) {
         console.error('Error fetching university detail:', error);

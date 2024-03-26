@@ -44,8 +44,13 @@ const getMajorDetailByUniCode = async (req, res) => {
         if (!major) {
             return res.status(404).json({ message: 'major not found.' });
         }
-
-        res.json(major);
+        const processedMajors = major.map(m => {
+            for (let key in m.dataValues) {
+                m.dataValues[key] = replaceEscapedNewlines(m.dataValues[key]);
+            }
+            return m;
+        });
+        res.status(200).json(processedMajors);
     } catch (error) {
         console.error('Error fetching major detail:', error);
         res.status(500).json({ message: 'Error fetching major detail', error: error.message });
