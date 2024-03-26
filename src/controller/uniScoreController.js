@@ -11,7 +11,15 @@ const getMajorsByUniversityCode = async (req, res) => {
         }
 
         const majors = await UniversityScore.findAll({
-            attributes: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year'],
+            attributes: [
+                [sequelize.fn('MIN', sequelize.col('uni_code')), 'uni_code'],
+                [sequelize.fn('MIN', sequelize.col('uni_name')), 'uni_name'],
+                'major_code',
+                [sequelize.fn('MIN', sequelize.col('major_name')), 'major_name'],
+                [sequelize.fn('MIN', sequelize.col('subject_group')), 'subject_group'],
+                [sequelize.fn('MIN', sequelize.col('admission_score')), 'admission_score'],
+                [sequelize.fn('MIN', sequelize.col('year')), 'year'],
+            ],
             where: whereClause,
             group: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year']
         });
