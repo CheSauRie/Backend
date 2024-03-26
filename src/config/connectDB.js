@@ -17,5 +17,5 @@ const connectDB = async () => {
 }
 
 module.exports = {
-    connectDB
+    connectDB,
 }

@@ -1,5 +1,5 @@
 const { UniversityScore } = require('../models');
-
+const { Sequelize } = require('sequelize');
 const getMajorsByUniversityCode = async (req, res) => {
     const { uniCode } = req.params;
     const { year } = req.query;
@@ -12,18 +12,18 @@ const getMajorsByUniversityCode = async (req, res) => {
 
         const majors = await UniversityScore.findAll({
             attributes: [
-                [sequelize.fn('MIN', sequelize.col('uni_code')), 'uni_code'],
-                [sequelize.fn('MIN', sequelize.col('uni_name')), 'uni_name'],
+                [Sequelize.fn('MIN', Sequelize.col('uni_code')), 'uni_code'],
+                [Sequelize.fn('MIN', Sequelize.col('uni_name')), 'uni_name'],
                 'major_code',
-                [sequelize.fn('MIN', sequelize.col('major_name')), 'major_name'],
-                [sequelize.fn('MIN', sequelize.col('subject_group')), 'subject_group'],
-                [sequelize.fn('MIN', sequelize.col('admission_score')), 'admission_score'],
-                [sequelize.fn('MIN', sequelize.col('year')), 'year'],
+                [Sequelize.fn('MIN', Sequelize.col('major_name')), 'major_name'],
+                [Sequelize.fn('MIN', Sequelize.col('subject_group')), 'subject_group'],
+                [Sequelize.fn('MAX', Sequelize.col('admission_score')), 'admission_score'],
+                [Sequelize.fn('MAX', Sequelize.col('year')), 'year'],
             ],
             where: whereClause,
             group: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year']
         });
-        res.json(majors);
+        res.status(200).json(majors);
     } catch (error) {
         console.error("Error fetching majors by university code:", error);
         res.status(500).json({ message: "Failed to fetch majors by university code", error: error.message });
