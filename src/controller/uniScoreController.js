@@ -13,7 +13,7 @@ const getMajorsByUniversityCode = async (req, res) => {
         const majors = await UniversityScore.findAll({
             attributes: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year'],
             where: whereClause,
-            group: ['major_code']
+            group: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year']
         });
         res.json(majors);
     } catch (error) {
@@ -37,14 +37,13 @@ const getAllUniversityNames = async (req, res) => {
 };
 
 const getScoresByMajorCodeAndUniversityCode = async (req, res) => {
-    const { majorCode, uniCode } = req.params; // Lấy major_code và uni_code từ params của request
+    const { majorCode, uniCode } = req.params;
     try {
         const scores = await UniversityScore.findAll({
             attributes: ['uni_code', 'uni_name', 'major_code', 'major_name', 'subject_group', 'admission_score', 'year'],
             where: {
                 uni_code: uniCode,
                 major_code: majorCode,
-                // year: "2021"
             },
             order: ['year'],
             distinct: true
