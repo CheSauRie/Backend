@@ -5,20 +5,24 @@ const getMajorsByUniversityCode = async (req, res) => {
     const { uniCode } = req.params;
 
     try {
-        const majors = await UniversityScore.sequelize.query(`
+        // Thực hiện truy vấn và lưu kết quả vào biến `results`
+        const [results, metadata] = await UniversityScore.sequelize.query(`
             SELECT DISTINCT ON (major_code) *
             FROM "UniversityScores"
-            WHERE uni_code = '${uniCode}'
+            WHERE uni_code = :uniCode
             ORDER BY major_code, year DESC
-        `);
+        `, {
+            replacements: { uniCode: uniCode }, // Sử dụng `replacements` để tránh SQL Injection
+            type: UniversityScore.sequelize.QueryTypes.SELECT // Chỉ định rằng đây là một truy vấn SELECT
+        });
 
-        res.status(200).json(majors);
+        // `results` chứa mảng của các ngành học
+        res.status(200).json(results);
     } catch (error) {
         console.error("Error fetching majors by university code:", error);
         res.status(500).json({ message: "Failed to fetch majors by university code", error: error.message });
     }
 };
-
 
 const getAllUniversityNames = async (req, res) => {
     try {
