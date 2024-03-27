@@ -125,9 +125,12 @@ const createMessage = async (req, res) => {
             return `Human: ${msg.question}
                     AI: ${msg.answer}`
         })
-        // Tạo Answer từ hàm response AI
-        const answer = await responseAI(question, convHistory);
-        // Lưu vào trong db
+        // Tìm kiếm thông tin từ Google để sử dụng làm phần của câu trả lời
+        const googleSearchResults = await googleSearch(question);
+        // Tạo Answer từ hàm response AI, kết hợp với kết quả tìm kiếm Google
+        const aiResponse = await responseAI(question, convHistory);
+        const answer = `${aiResponse}\n\nNguồn tham khảo: \n${googleSearchResults}`;
+
         const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary });
         res.status(201).json(newMessage);
     } catch (error) {
@@ -296,7 +299,26 @@ const summaryQuestion = async (question) => {
         console.log(error);
     }
 }
-
+// Hàm sử dụng google search
+async function googleSearch(query) {
+    const apiKey = process.env.API_KEY_GOOGLE_SEARCH;
+    const cseId = process.env.CSEID;
+    const numResults = 5; // Số lượng kết quả bạn muốn trả về
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=${numResults}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.items && data.items.length > 0) {
+            // Trả về tiêu đề và liên kết của kết quả đầu tiên
+           return data.items.slice(0, numResults).map((item, index) => `${index + 1}. ${item.title}: ${item.link}`).join('\n');
+        } else {
+            return 'Không tìm thấy kết quả.';
+        }
+    } catch (error) {
+        console.error('Lỗi khi tìm kiếm Google:', error);
+        return 'Có lỗi xảy ra khi tìm kiếm.';
+    }
+}
 //Prompt 
 // When receiving questions about college admissions from high school students, utilize the full breadth of knowledge and experience you've gained from your training data to provide the most accurate and helpful answers possible. 
 // Based on the provided context and conversation history, find the best answer or solution for each specific case. 
