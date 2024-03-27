@@ -124,7 +124,7 @@ const getUniversityDetail = async (req, res) => {
         for (let key in universityDetail) {
             universityDetail[key] = replaceEscapedNewlines(universityDetail[key]);
         }
-        res.json(universityDetail);
+        res.status(200).json(universityDetail);
     } catch (error) {
         console.error('Error fetching university detail:', error);
         res.status(500).json({ message: 'Error fetching university detail', error: error.message });

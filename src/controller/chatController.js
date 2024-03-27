@@ -84,7 +84,6 @@ const getDetailMessage = async (req, res) => {
         } else {
             res.status(404).json({ message: 'No chats found for this user.' });
         }
-        //return messages;
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
