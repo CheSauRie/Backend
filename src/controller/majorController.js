@@ -1,8 +1,10 @@
 const { Major, University, MarkdownUni } = require('../models');
 const { Sequelize } = require('sequelize');
+const { replaceEscapedNewlines } = require('../ultis/replaceEscapedNewlines');
+
 const createMajor = async (req, res) => {
     try {
-        const { uni_id, major_name, major_code, admissions_information, admissions_method, description_major } = req.body;
+        const { uni_id, major_name, major_code, admissions_information, admissions_method, description_major, quota } = req.body;
 
         // Tạo major mới
         const major = await Major.create({
@@ -11,7 +13,8 @@ const createMajor = async (req, res) => {
             major_code,
             admissions_information,
             admissions_method,
-            description_major
+            description_major,
+            quota,
         });
 
         res.status(201).json(major);
