@@ -1,6 +1,49 @@
+const axios = require('axios');
 const { Review, Major, University, User } = require('../models');
+const { badWords } = require('vn-badwords');
 require('dotenv').config()
+const badWordsList = require('../../uploads/badWordsList.json').badWords;
 
+const { google } = require('googleapis');
+
+const API_KEY = process.env.API_KEY_GOOGLE_SEARCH // Thay thế bằng API key thực tế của bạn
+const DISCOVERY_URL = 'https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1';
+
+// Hàm kiểm tra từ ngữ không phù hợp sử dụng Perspective API
+async function checkForInappropriateLanguage(content) {
+    return new Promise((resolve, reject) => {
+        google.discoverAPI(DISCOVERY_URL)
+            .then(client => {
+                const analyzeRequest = {
+                    comment: { text: content },
+                    languages: ["en"], // Thêm hoặc thay đổi ngôn ngữ nếu cần
+                    requestedAttributes: { TOXICITY: {} }
+                };
+
+                client.comments.analyze({
+                    key: API_KEY,
+                    resource: analyzeRequest,
+                }, (err, response) => {
+                    if (err) {
+                        console.error('Error calling Perspective API:', err);
+                        return reject(err);
+                    }
+
+                    const toxicityScore = response.data.attributeScores.TOXICITY.summaryScore.value;
+                    console.log(`Toxicity score: ${toxicityScore}`);
+                    resolve(toxicityScore > 0.8); // Điều chỉnh ngưỡng theo yêu cầu
+                });
+            })
+            .catch(err => {
+                console.error('Error discovering Perspective API:', err);
+                reject(err);
+            });
+    });
+}
+function containsBadWords(content) {
+    const contentLowerCase = content.toLowerCase();
+    return badWordsList.some(badWord => contentLowerCase.includes(badWord.toLowerCase()));
+}
 const createReview = async (req, res) => {
     const { id } = req.user;
     const { major_id, content, parent_review_id } = req.body;
@@ -8,6 +51,11 @@ const createReview = async (req, res) => {
     // Validate input
     if (!id || !major_id || !content) {
         return res.status(400).send({ message: 'Missing required fields' });
+    }
+    const isInappropriate = containsBadWords(content);
+
+    if (isInappropriate) {
+        return res.status(400).send({ message: 'Nội dung không phù hợp.' });
     }
 
     try {

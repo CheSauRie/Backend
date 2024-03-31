@@ -88,7 +88,7 @@ const getUniversityImages = async (req, res) => {
         });
 
         if (markdownUni) {
-            res.json(markdownUni);
+            res.status(200).json(markdownUni);
         } else {
             res.status(404).send({ message: 'Images not found for the specified university ID.' });
         }

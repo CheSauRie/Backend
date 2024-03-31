@@ -128,7 +128,7 @@ const createMessage = async (req, res) => {
         const googleSearchResults = await googleSearch(question);
         // Tạo Answer từ hàm response AI, kết hợp với kết quả tìm kiếm Google
         const aiResponse = await responseAI(question, convHistory);
-        const answer = `${aiResponse}\n\nNguồn tham khảo: \n${googleSearchResults}`;
+        const answer = `${aiResponse}\n\n[Nguồn tham khảo:] \n${googleSearchResults}`;
 
         const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary });
         res.status(201).json(newMessage);
@@ -235,10 +235,15 @@ const responseAI = async (question, convHistory) => {
         Try to find the answer in the context. If the answer is not given in the context, use all of your training or conversation history to come up with an answer.
         It's more important to be accurate than complete. If you can't give a reliable answer and the question or concern is not related to your field, please say 'I don't know.'
         Translate the answer to Vietnamese
+        Additionally, suggest 3 related questions that could further help the student understand the topic or explore related areas. These questions should encourage deeper thinking or inquiry about the subject matter. Mark the start of these questions with "Related Questions:" and each question should be numbered (1, 2, 3).
         Context: {context}
         Conversation history: {conv_history}
         Question: {question}
         answer:
+        [Related Questions:]
+        1. 
+        2. 
+        3. 
     `
         const answerPrompt = PromptTemplate.fromTemplate(answerTemplate)
         const standaloneQuestionPrompt = PromptTemplate.fromTemplate(standaloneQuestionTemplate)
@@ -324,7 +329,6 @@ async function googleSearch(query) {
 // When specific information is not available in the question or within your data, apply general principles and experience in admissions counseling to offer advice or solutions that could be applied. 
 // If a question is beyond your capabilities or requires updated information you do not possess, describe the next steps or reliable sources of information the user can seek for more details. 
 // Ensure all responses are accurately translated into Vietnamese to meet the user's needs.
-
 
 
 module.exports = {
