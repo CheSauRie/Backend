@@ -133,12 +133,15 @@ const createMessage = async (req, res) => {
 
         // Loại bỏ các URL trùng lập
         const uniqueUrls = googleSearchResults.split('\n').filter(url => !existingUrls.includes(url)).join('\n');
+        console.log(uniqueUrls);
 
         if (uniqueUrls.length > 0) {
             const scrapUrls = extractUrlsFromText(uniqueUrls);
             try {
                 const textUpload = await extractTextFromUrls(scrapUrls);
+                console.log(textUpload);
                 await uploadToSupabase(textUpload);
+                console.log("oke");
             } catch (error) {
                 console.log(`Lỗi khi trích xuất từ URL ${url}:`, error);
             }
