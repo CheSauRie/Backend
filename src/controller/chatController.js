@@ -280,14 +280,15 @@ const responseAI = async (question, convHistory) => {
         It's more important to be accurate than complete. If you can't give a reliable answer and the question or concern is not related to your field, please say 'I don't know.'
         Translate the answer to Vietnamese
         Additionally, suggest 3 related questions that could further help the student understand the topic or explore related areas. These questions should encourage deeper thinking or inquiry about the subject matter. Mark the start of these questions with "Related Questions:" and each question should be numbered (1, 2, 3).
-        Context: {context}
-        Conversation history: {conv_history}
-        Question: {question}
-        answer:
         [Related Questions:]
         1. 
         2. 
         3. 
+        Context: {context}
+        Conversation history: {conv_history}
+        Question: {question}
+        answer:
+        
     `
         const answerPrompt = PromptTemplate.fromTemplate(answerTemplate)
         const standaloneQuestionPrompt = PromptTemplate.fromTemplate(standaloneQuestionTemplate)
