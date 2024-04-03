@@ -22,7 +22,8 @@ module.exports = (sequelize, DataTypes) => {
     chat_id: DataTypes.INTEGER,
     question: DataTypes.TEXT,
     answer: DataTypes.TEXT,
-    summary: DataTypes.TEXT
+    summary: DataTypes.TEXT,
+    url_references: DataTypes.STRING
   }, {
     sequelize,
     modelName: 'Message',

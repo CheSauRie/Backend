@@ -10,6 +10,7 @@ const { PromptTemplate } = require("langchain/prompts")
 const { StringOutputParser } = require("langchain/schema/output_parser")
 const { RunnablePassthrough, RunnableSequence } = require("langchain/schema/runnable");
 const { Chat, Message } = require('../models');
+const puppeteer = require('puppeteer');
 require('dotenv').config()
 
 /**
@@ -110,27 +111,45 @@ const getMessageHistory = async (chat_id) => {
 
 //Tạo message: đầu vào là question => tạo answer => lưu answer trong csdl
 const createMessage = async (req, res) => {
+    const { chat_id, question } = req.body;
     try {
-        const { chat_id, question } = req.body;
-        // Đổi tham số hàm responeAI thành question
+        // Lấy lịch sử trò chuyện
         const messages = await getMessageHistory(chat_id);
-        /**
-         * Đưa về summary question(tức là standalone question) rồi mới lưu vào database
-         */
-        const response = await summaryQuestion(question)
+        // Đưa về standalone Quesion
+        const response = await summaryQuestion(question);
+        // lấy kết quả
         const summary = response.content;
         // Format lịch sử cuộc trò chuyện
         const convHistory = messages.map(msg => {
             return `Human: ${msg.question}
                     AI: ${msg.answer}`
         })
-        // Tìm kiếm thông tin từ Google để sử dụng làm phần của câu trả lời
-        const googleSearchResults = await googleSearch(question);
+        // Tìm kiếm thông tin từ Google để sử dụng làm phần của câu trả lời, đưa vào câu trả lời
+        const googleSearchResults = await googleSearch(question, 3);
+
+        const existingUrls = (await Message.findAll({
+            attributes: ['url_references'],
+        })).map(message => message.url_references).join('\n').split('\n');
+
+        // Loại bỏ các URL trùng lập
+        const uniqueUrls = googleSearchResults.split('\n').filter(url => !existingUrls.includes(url)).join('\n');
+
+        if (uniqueUrls.length > 0) {
+            const scrapUrls = extractUrlsFromText(uniqueUrls);
+            try {
+                const textUpload = await extractTextFromUrls(scrapUrls);
+                await uploadToSupabase(textUpload);
+            } catch (error) {
+                console.log(`Lỗi khi trích xuất từ URL ${url}:`, error);
+            }
+        }
+
         // Tạo Answer từ hàm response AI, kết hợp với kết quả tìm kiếm Google
         const aiResponse = await responseAI(question, convHistory);
+        // Tạo Answer
         const answer = `${aiResponse}\n\n[Nguồn tham khảo:] \n${googleSearchResults}`;
 
-        const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary });
+        const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary, url_references: uniqueUrls });
         res.status(201).json(newMessage);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -141,34 +160,68 @@ const createMessage = async (req, res) => {
 /*
 * Các hàm dùng cho phản hồi của AI
 */
+function extractUrlsFromText(text) {
+    // Điều chỉnh biểu thức chính quy để nó khớp với cả 'http' và 'https'
+    const urlRegex = /http[s]?:\/\/[^\s]+/g;
+    const urls = [];
 
-// const logOutput = async () => {
-//     const loader = new PDFLoader('../pdf/FTU.pdf');
-//     const docs = await loader.load();
-//     const splitter = new RecursiveCharacterTextSplitter({
-//         chunkSize: 10,
-//         chunkOverlap: 1,
-//     });
-//     const docOutput = await splitter.splitDocuments([
-//         new Document({ pageContent: docs }),
-//     ]);
-//     console.log(docOutput);
-// }
-// logOutput()
+    // Tách chuỗi dựa trên dấu xuống dòng và lặp qua từng dòng
+    const lines = text.split('\n');
+    for (const line of lines) {
+        // Sử dụng biểu thức chính quy để tìm URL trong dòng
+        const matches = line.match(urlRegex);
+        if (matches) {
+            // Thêm URL tìm được vào mảng kết quả
+            urls.push(...matches);
+        }
+    }
 
+    return urls;
+}
+/**
+ * Trích xuất văn bản từ một mảng các URL sử dụng Puppeteer.
+ * @param {string[]} urls - Một mảng các URL cần trích xuất văn bản.
+ * @returns {Promise<string[]>} - Một Promise trả về mảng văn bản được trích xuất từ mỗi URL.
+ */
+async function extractTextFromUrls(urls) {
+    const browser = await puppeteer.launch({ headless: true });
+    const texts = [];
+
+    for (const url of urls) {
+        const page = (await browser.pages())[0];
+        try {
+            await page.goto(url); // Đợi cho đến khi không còn mạng nào nữa
+            const extractedText = await page.$eval('*', (el) => {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNode(el);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return window.getSelection().toString();
+            });
+            texts.push(extractedText);
+        } catch (error) {
+            console.error(`Lỗi khi trích xuất từ URL ${url}:`, error);
+            texts.push("");
+        } finally {
+            // await page.close();
+        }
+    }
+
+    await browser.close();
+    return texts;
+}
 
 // Hàm này chạy sau khi có đủ data.
-const uploadToSupabase = async () => {
+const uploadToSupabase = async (text) => {
     try {
-        const text = await fs.readFile('E:\\KLTN\\Backend\\pdf\\FTU.txt', 'utf8');
-
         const splitter = new RecursiveCharacterTextSplitter({
             chunkSize: 500,
             chunkOverlap: 50,
             separators: ['\n\n', '\n', ' ', ''] //có thể là dấu ##
         });
 
-        const output = await splitter.createDocuments([text]);
+        const output = await splitter.createDocuments(text);
 
         const sbApiKey = process.env.SUPABASE_API_KEY
         const sbUrl = process.env.SUPABASE_URL_LC_CHATBOT
@@ -210,16 +263,7 @@ const createRetrieval = () => {
 const combineDocuments = (docs) => {
     return docs.map((doc) => doc.pageContent).join('\n\n')
 }
-//Định dạng lịch sử 
-const formatConvHistory = (messages) => {
-    return messages.map((message, i) => {
-        if (i % 2 === 0) {
-            return `Human: ${message.question}`
-        } else {
-            return `AI: ${message.answer}`
-        }
-    }).join('\n')
-}
+
 //Tạo phản hồi AI
 const responseAI = async (question, convHistory) => {
     try {
@@ -304,17 +348,17 @@ const summaryQuestion = async (question) => {
     }
 }
 // Hàm sử dụng google search
-async function googleSearch(query) {
+async function googleSearch(query, numResult) {
     const apiKey = process.env.API_KEY_GOOGLE_SEARCH;
     const cseId = process.env.CSEID;
-    const numResults = 5; // Số lượng kết quả bạn muốn trả về
+    const numResults = numResult; // Số lượng kết quả bạn muốn trả về
     const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=${numResults}`;
     try {
         const response = await fetch(url);
         const data = await response.json();
         if (data.items && data.items.length > 0) {
             // Trả về tiêu đề và liên kết của kết quả đầu tiên
-           return data.items.slice(0, numResults).map((item, index) => `${index + 1}. ${item.title}: ${item.link}`).join('\n');
+            return data.items.slice(0, numResults).map((item, index) => `${index + 1}. ${item.title}: ${item.link}`).join('\n');
         } else {
             return 'Không tìm thấy kết quả.';
         }
@@ -323,12 +367,23 @@ async function googleSearch(query) {
         return 'Có lỗi xảy ra khi tìm kiếm.';
     }
 }
-//Prompt 
-// When receiving questions about college admissions from high school students, utilize the full breadth of knowledge and experience you've gained from your training data to provide the most accurate and helpful answers possible. 
-// Based on the provided context and conversation history, find the best answer or solution for each specific case. 
-// When specific information is not available in the question or within your data, apply general principles and experience in admissions counseling to offer advice or solutions that could be applied. 
-// If a question is beyond your capabilities or requires updated information you do not possess, describe the next steps or reliable sources of information the user can seek for more details. 
-// Ensure all responses are accurately translated into Vietnamese to meet the user's needs.
+
+// Hàm sử dụng Google Custom Search để tìm kiếm và trả về danh sách các { title, link }
+async function googleSearchToDB(query, numResult) {
+    const apiKey = process.env.API_KEY_GOOGLE_SEARCH;
+    const cseId = process.env.CSEID;
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=${numResult}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.items.map(item => ({ title: item.title, link: item.link }));
+    } catch (error) {
+        console.error('Lỗi khi tìm kiếm Google:', error);
+        return [];
+    }
+}
+
+
 
 
 module.exports = {
@@ -341,42 +396,3 @@ module.exports = {
     summaryQuestion
 }
 
-
-// When receiving questions about college admissions from high school students, utilize the full breadth of knowledge and experience you've gained from your training data to provide the most accurate and helpful answers possible.
-//         Based on the provided context and conversation history, find the best answer or solution for each specific case.
-//         When specific information is not available in the question or within your data, apply general principles and experience in admissions counseling to offer advice or solutions that could be applied.
-//         If a question is beyond your capabilities or requires updated information you do not possess, describe the next steps or reliable sources of information the user can seek for more details.
-//         Context: {context}
-//         Conversation history: {conv_history}
-//         Question: {question}
-//         answer:
-
-// const answerTemplate = `As a highly knowledgeable and experienced college admissions counselor, your primary objective is to guide and support high school students through the complexities of the college admissions process. Your role involves responding to their inquiries, addressing their concerns, and providing expert advice that is specifically tailored to their unique needs and circumstances. Despite receiving questions or concerns in Vietnamese, your responses must be crafted in Vietnamese, offering detailed and informative answers that draw upon the provided context and the conversation history. Here's how to optimize your approach:
-
-//         1. **Contextual Understanding**: Always start by thoroughly analyzing the provided context and conversation history. This will help you grasp the nuances of each student's situation and tailor your advice accordingly.
-        
-//         2. **Leverage Your Training Data**: Utilize the breadth of knowledge and insights you've gained from your extensive training data to inform your responses. This includes drawing on relevant examples, statistics, and case studies that can provide students with a clearer understanding of the admissions landscape.
-        
-//         3. **Precision Over Completeness**: Aim for accuracy in your responses. It's better to provide a precise and reliable answer to the part of the question you are confident about than to cover every aspect with less certainty. If a question falls outside your area of expertise or requires updated information that you do not possess, it's acceptable to acknowledge this by saying 'I don't know.'
-        
-//         4. **Translation**: Ensure that your answers are translated into Vietnamese, maintaining the integrity and nuance of the original response.
-        
-//         5. **Engagement and Empathy**: Remember to engage with the students' concerns empathetically, acknowledging the stress and uncertainty that can accompany the college admissions process. Your responses should not only be informative but also supportive and encouraging.
-        
-//         By following these guidelines, you will be better equipped to provide high school students with the guidance they need, leveraging the full capabilities of your training data and ensuring that your advice is both relevant and impactful.
-        
-//         Context: {context}
-//         Conversation history: {conv_history}
-//         Question: {question}
-//         Answer:
-//     `
-
-
-// As a highly knowledgeable and experienced college admissions counselor, your goal is to provide guidance and support to high school students navigating the college admissions process. You will answer their questions, address their concerns, and offer expert advice tailored to their specific needs and circumstances. To receive questions or concerns from high school students, they will provide them in Vietnamese. You are to reply with detailed and informative answers based on context provided and the conversation history in Vietnamese without processing the original question or concern.
-//         Try to find the answer in the context. If the answer is not given in the context, use all of your training and conversation history to come up with an answer.
-//         It's more important to be accurate than complete. If you can't give a reliable answer and the question or concern is not related to your field, please say 'I don't know.'
-//         Translate the answer to Vietnamese
-//         Context: {context}
-//         Conversation history: {conv_history}
-//         Question: {question}
-//         answer:

@@ -3,7 +3,7 @@ const { Sequelize } = require('sequelize');
 const { replaceEscapedNewlines } = require('../ultis/replaceEscapedNewlines');
 require('dotenv').config()
 const cloudinary = require('cloudinary').v2;
-
+const client = require('../middleware/redisClient.js');
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -101,6 +101,12 @@ const getUniversityImages = async (req, res) => {
 // Chi tiết university
 const getUniversityDetail = async (req, res) => {
     try {
+
+        const cacheUniversities = await client.get('universityDetail');
+        if (cacheUniversities) {
+            console.log("da cahce");
+            return res.json({ universityDetail: JSON.parse(cacheUniversities) });
+        }
         const { uni_code } = req.params;
         const university = await University.findOne({
             where: { uni_code },
@@ -124,6 +130,10 @@ const getUniversityDetail = async (req, res) => {
         for (let key in universityDetail) {
             universityDetail[key] = replaceEscapedNewlines(universityDetail[key]);
         }
+
+        await client.set('universityDetail', JSON.stringify(universityDetail), {
+            EX: 3600, // Thời gian sống của cache (ví dụ: 3600 giây = 1 giờ)
+        });
         res.status(200).json(universityDetail);
     } catch (error) {
         console.error('Error fetching university detail:', error);
@@ -154,7 +164,7 @@ const getUniversitiesByAddress = async (req, res) => {
         res.status(500).json({ message: 'Error fetching universities by address', error: error.message });
     }
 };
-
+//Lấy trường theo ngành
 const getUniversitiesByMajor = async (req, res) => {
     const { majorName } = req.body;
     try {
