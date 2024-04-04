@@ -1,4 +1,4 @@
-FROM node:18-alpine
+# FROM node:18-alpine
 
 # Set up puppeteer dependencies
 FROM ghcr.io/puppeteer/puppeteer:19.11.1
