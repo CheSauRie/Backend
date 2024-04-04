@@ -143,6 +143,7 @@ const createMessage = async (req, res) => {
                 await uploadToSupabase(textUpload);
             } catch (error) {
                 console.log(`Lỗi khi trích xuất từ URL ${url}:`, error);
+                return;
             }
         }
 
