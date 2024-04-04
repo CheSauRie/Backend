@@ -11,6 +11,8 @@ const { StringOutputParser } = require("langchain/schema/output_parser")
 const { RunnablePassthrough, RunnableSequence } = require("langchain/schema/runnable");
 const { Chat, Message } = require('../models');
 const puppeteer = require('puppeteer');
+const { convert } = require('html-to-text');
+const axios = require('axios');
 require('dotenv').config()
 
 /**
@@ -133,15 +135,12 @@ const createMessage = async (req, res) => {
 
         // Loại bỏ các URL trùng lập
         const uniqueUrls = googleSearchResults.split('\n').filter(url => !existingUrls.includes(url)).join('\n');
-        console.log(uniqueUrls);
 
         if (uniqueUrls.length > 0) {
             const scrapUrls = extractUrlsFromText(uniqueUrls);
             try {
                 const textUpload = await extractTextFromUrls(scrapUrls);
-                console.log(textUpload);
                 await uploadToSupabase(textUpload);
-                console.log("oke");
             } catch (error) {
                 console.log(`Lỗi khi trích xuất từ URL ${url}:`, error);
             }
@@ -181,49 +180,66 @@ function extractUrlsFromText(text) {
 
     return urls;
 }
+
+
 /**
  * Trích xuất văn bản từ một mảng các URL sử dụng Puppeteer.
  * @param {string[]} urls - Một mảng các URL cần trích xuất văn bản.
  * @returns {Promise<string[]>} - Một Promise trả về mảng văn bản được trích xuất từ mỗi URL.
  */
+// async function extractTextFromUrls(urls) {
+//     const browser = await puppeteer.launch({
+//         args: [
+//             "--disable-setuid-sandbox",
+//             "--no-sandbox",
+//             "--single-process",
+//             "--no-zygote"
+//         ],
+//         headless: true,
+//         executablePath: process.env.NODE_ENV === "production"
+//             ? process.env.PUPPETEER_EXECUTABLE_PATH
+//             : puppeteer.executablePath(),
+
+//     });
+//     const texts = [];
+
+//     for (const url of urls) {
+//         const page = (await browser.pages())[0];
+//         try {
+//             await page.goto(url); // Đợi cho đến khi không còn mạng nào nữa
+//             const extractedText = await page.$eval('*', (el) => {
+//                 const selection = window.getSelection();
+//                 const range = document.createRange();
+//                 range.selectNode(el);
+//                 selection.removeAllRanges();
+//                 selection.addRange(range);
+//                 return window.getSelection().toString();
+//             });
+//             texts.push(extractedText);
+//         } catch (error) {
+//             console.error(`Lỗi khi trích xuất từ URL ${url}:`, error);
+//             texts.push("");
+//         } finally {
+//             // await page.close();
+//         }
+//     }
+
+//     await browser.close();
+//     return texts;
+// }
+
 async function extractTextFromUrls(urls) {
-    const browser = await puppeteer.launch({
-        args: [
-            "--disable-setuid-sandbox",
-            "--no-sandbox",
-            "--single-process",
-            "--no-zygote"
-        ],
-        headless: true,
-        executablePath: process.env.NODE_ENV === "production"
-            ? process.env.PUPPETEER_EXECUTABLE_PATH
-            : puppeteer.executablePath(),
-
-    });
     const texts = [];
-
     for (const url of urls) {
-        const page = (await browser.pages())[0];
         try {
-            await page.goto(url); // Đợi cho đến khi không còn mạng nào nữa
-            const extractedText = await page.$eval('*', (el) => {
-                const selection = window.getSelection();
-                const range = document.createRange();
-                range.selectNode(el);
-                selection.removeAllRanges();
-                selection.addRange(range);
-                return window.getSelection().toString();
-            });
-            texts.push(extractedText);
+            const response = await axios.get(url);
+            const text = convert(response.data);
+            texts.push(text);
         } catch (error) {
             console.error(`Lỗi khi trích xuất từ URL ${url}:`, error);
             texts.push("");
-        } finally {
-            // await page.close();
         }
     }
-
-    await browser.close();
     return texts;
 }
 
