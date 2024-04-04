@@ -9,6 +9,7 @@ ENV PUPPETEER_SKIP_CHRONIUM_DOWNLOAD=true \
 WORKDIR /usr/src/app
 
 COPY package*.json ./
+RUN ls -la /usr/src/app/package-lock.json
 
 RUN npm install
 
