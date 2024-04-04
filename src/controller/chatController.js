@@ -187,7 +187,19 @@ function extractUrlsFromText(text) {
  * @returns {Promise<string[]>} - Một Promise trả về mảng văn bản được trích xuất từ mỗi URL.
  */
 async function extractTextFromUrls(urls) {
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({
+        args: [
+            "--disable-setuid-sandbox",
+            "--no-sandbox",
+            "--single-process",
+            "--no-zygote"
+        ],
+        headless: true,
+        executablePath: process.env.NODE_ENV === "production"
+            ? process.env.PUPPETEER_EXECUTABLE_PATH
+            : puppeteer.executablePath(),
+
+    });
     const texts = [];
 
     for (const url of urls) {
