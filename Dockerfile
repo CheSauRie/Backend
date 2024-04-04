@@ -8,12 +8,7 @@ ENV PUPPETEER_SKIP_CHRONIUM_DOWNLOAD=true \
 
 WORKDIR /usr/src/app
 
-# Tạo một người dùng không phải root và chuyển quyền sở hữu
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY package*.json ./
-RUN chown -R appuser:appgroup /usr/src/app
-
-USER appuser
 
 RUN npm install
 
