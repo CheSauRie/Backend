@@ -1,4 +1,5 @@
 const { RecursiveCharacterTextSplitter } = require("langchain/text_splitter")
+const { PineconeClient, Pinecone } = require("@pinecone-database/pinecone");
 const { PDFLoader } = require("langchain/document_loaders/fs/pdf");
 const { Document } = require("langchain/document");
 const fs = require('fs/promises');
@@ -10,9 +11,7 @@ const { PromptTemplate } = require("langchain/prompts")
 const { StringOutputParser } = require("langchain/schema/output_parser")
 const { RunnablePassthrough, RunnableSequence } = require("langchain/schema/runnable");
 const { Chat, Message } = require('../models');
-const puppeteer = require('puppeteer');
-const { convert } = require('html-to-text');
-const axios = require('axios');
+const { PineconeStore } = require("@langchain/pinecone");
 require('dotenv').config()
 
 /**
@@ -129,166 +128,42 @@ const createMessage = async (req, res) => {
         // Tìm kiếm thông tin từ Google để sử dụng làm phần của câu trả lời, đưa vào câu trả lời
         const googleSearchResults = await googleSearch(question, 3);
 
-        const existingUrls = (await Message.findAll({
-            attributes: ['url_references'],
-        })).map(message => message.url_references).join('\n').split('\n');
-
-        // Loại bỏ các URL trùng lập
-        const uniqueUrls = googleSearchResults.split('\n').filter(url => !existingUrls.includes(url)).join('\n');
-
-        if (uniqueUrls.length > 0) {
-            const scrapUrls = extractUrlsFromText(uniqueUrls);
-            try {
-                const textUpload = await extractTextFromUrls(scrapUrls);
-                await uploadToSupabase(textUpload);
-            } catch (error) {
-                console.log(`Lỗi khi trích xuất từ URL ${url}:`, error);
-                return;
-            }
-        }
-
         // Tạo Answer từ hàm response AI, kết hợp với kết quả tìm kiếm Google
         const aiResponse = await responseAI(question, convHistory);
         // Tạo Answer
         const answer = `${aiResponse}\n\n[Nguồn tham khảo:] \n${googleSearchResults}`;
 
-        const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary, url_references: uniqueUrls });
+        const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary, url_references: googleSearchResults });
         res.status(201).json(newMessage);
     } catch (error) {
+        console.log(error);
         res.status(500).json({ error: error.message });
     }
 }
 
 
-/*
-* Các hàm dùng cho phản hồi của AI
-*/
-function extractUrlsFromText(text) {
-    // Điều chỉnh biểu thức chính quy để nó khớp với cả 'http' và 'https'
-    const urlRegex = /http[s]?:\/\/[^\s]+/g;
-    const urls = [];
-
-    // Tách chuỗi dựa trên dấu xuống dòng và lặp qua từng dòng
-    const lines = text.split('\n');
-    for (const line of lines) {
-        // Sử dụng biểu thức chính quy để tìm URL trong dòng
-        const matches = line.match(urlRegex);
-        if (matches) {
-            // Thêm URL tìm được vào mảng kết quả
-            urls.push(...matches);
-        }
-    }
-
-    return urls;
-}
-
-
-/**
- * Trích xuất văn bản từ một mảng các URL sử dụng Puppeteer.
- * @param {string[]} urls - Một mảng các URL cần trích xuất văn bản.
- * @returns {Promise<string[]>} - Một Promise trả về mảng văn bản được trích xuất từ mỗi URL.
- */
-// async function extractTextFromUrls(urls) {
-//     const browser = await puppeteer.launch({
-//         args: [
-//             "--disable-setuid-sandbox",
-//             "--no-sandbox",
-//             "--single-process",
-//             "--no-zygote"
-//         ],
-//         headless: true,
-//         executablePath: process.env.NODE_ENV === "production"
-//             ? process.env.PUPPETEER_EXECUTABLE_PATH
-//             : puppeteer.executablePath(),
-
-//     });
-//     const texts = [];
-
-//     for (const url of urls) {
-//         const page = (await browser.pages())[0];
-//         try {
-//             await page.goto(url); // Đợi cho đến khi không còn mạng nào nữa
-//             const extractedText = await page.$eval('*', (el) => {
-//                 const selection = window.getSelection();
-//                 const range = document.createRange();
-//                 range.selectNode(el);
-//                 selection.removeAllRanges();
-//                 selection.addRange(range);
-//                 return window.getSelection().toString();
-//             });
-//             texts.push(extractedText);
-//         } catch (error) {
-//             console.error(`Lỗi khi trích xuất từ URL ${url}:`, error);
-//             texts.push("");
-//         } finally {
-//             // await page.close();
-//         }
-//     }
-
-//     await browser.close();
-//     return texts;
-// }
-
-async function extractTextFromUrls(urls) {
-    const texts = [];
-    for (const url of urls) {
-        try {
-            const response = await axios.get(url);
-            const text = convert(response.data);
-            texts.push(text);
-        } catch (error) {
-            console.error(`Lỗi khi trích xuất từ URL ${url}:`, error);
-            texts.push("");
-        }
-    }
-    return texts;
-}
-
-// Hàm này chạy sau khi có đủ data.
-const uploadToSupabase = async (text) => {
-    try {
-        const splitter = new RecursiveCharacterTextSplitter({
-            chunkSize: 500,
-            chunkOverlap: 50,
-            separators: ['\n\n', '\n', ' ', ''] //có thể là dấu ##
-        });
-
-        const output = await splitter.createDocuments(text);
-
-        const sbApiKey = process.env.SUPABASE_API_KEY
-        const sbUrl = process.env.SUPABASE_URL_LC_CHATBOT
-        const openAIApiKey = process.env.OPENAI_API_KEY
-
-        const client = createClient(sbUrl, sbApiKey)
-
-        await SupabaseVectorStore.fromDocuments(
-            output,
-            new OpenAIEmbeddings({
-                openAIApiKey
-            }),
-            {
-                client,
-                tableName: 'documents',
-            }
-        )
-    } catch (error) {
-        console.log(error);
-    }
-}
 //Tạo bộ truy xuất
-const createRetrieval = () => {
-    const sbApiKey = process.env.SUPABASE_API_KEY
-    const sbUrl = process.env.SUPABASE_URL_LC_CHATBOT
-    const openAIApiKey = process.env.OPENAI_API_KEY
-    const client = createClient(sbUrl, sbApiKey)
-    const embeddings = new OpenAIEmbeddings({ openAIApiKey })
-    const vectorStore = new SupabaseVectorStore(embeddings, {
-        client,
-        tableName: "documents",
-        queryName: 'match_documents'
-    })
+const createRetrieval = async () => {
+    // const sbApiKey = process.env.SUPABASE_API_KEY
+    // const sbUrl = process.env.SUPABASE_URL_LC_CHATBOT
+    // const openAIApiKey = process.env.OPENAI_API_KEY
+    // const client = createClient(sbUrl, sbApiKey)
+    // const embeddings = new OpenAIEmbeddings({ openAIApiKey })
+    // const vectorStore = new SupabaseVectorStore(embeddings, {
+    //     client,
+    //     tableName: "documents",
+    //     queryName: 'match_documents',
+    // })
 
-    const retriever = vectorStore.asRetriever()
+    const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+
+    const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
+    const vectorStore = await PineconeStore.fromExistingIndex(
+        new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY }),
+        { pineconeIndex }
+    );
+
+    const retriever = vectorStore.asRetriever();
     return retriever
 }
 //Kết hợp tài liệu
@@ -301,7 +176,7 @@ const responseAI = async (question, convHistory) => {
     try {
         const openAIApiKey = process.env.OPENAI_API_KEY
         const llm = new ChatOpenAI({ openAIApiKey, modelName: "gpt-4-1106-preview" })
-        const retriever = createRetrieval()
+        const retriever = await createRetrieval()
         const standaloneQuestionTemplate = `Given some conversation history (if any) and a question, convert the question to a standalone question and translate into Vietnamese.
         conversation history: {conv_history}
         question: {question} 
@@ -400,23 +275,6 @@ async function googleSearch(query, numResult) {
         return 'Có lỗi xảy ra khi tìm kiếm.';
     }
 }
-
-// Hàm sử dụng Google Custom Search để tìm kiếm và trả về danh sách các { title, link }
-async function googleSearchToDB(query, numResult) {
-    const apiKey = process.env.API_KEY_GOOGLE_SEARCH;
-    const cseId = process.env.CSEID;
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=${numResult}`;
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        return data.items.map(item => ({ title: item.title, link: item.link }));
-    } catch (error) {
-        console.error('Lỗi khi tìm kiếm Google:', error);
-        return [];
-    }
-}
-
-
 
 
 module.exports = {
