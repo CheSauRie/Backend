@@ -38,7 +38,7 @@ const puppeteer = require('puppeteer');
         headless: true
     });
     const page = (await browser.pages())[0];
-    await page.goto('https://github.com/puppeteer/puppeteer/issues/581');
+    await page.goto('https://tuyensinh.uet.vnu.edu.vn/tin-tuyen-sinh/thong-tin-tuyen-sinh-dai-hoc-nam-2024-du-kien/');
     let extractedText = await page.$eval('*', (el) => {
         const selection = window.getSelection();
         const range = document.createRange();
@@ -48,9 +48,7 @@ const puppeteer = require('puppeteer');
         return window.getSelection().toString();
     });
 
-    extractedText = extractedText
-        .replace(/\s+/g, ' ')
-        .trim()
+    extractedText = extractedText.replace(/\r\n/g, '\n').replace(/\n+/g, '\n').trim()
     console.log(extractedText);
 
     await browser.close();

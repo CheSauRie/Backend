@@ -216,14 +216,11 @@ async function extractTextFromUrls(urls) {
                 selection.addRange(range);
                 return window.getSelection().toString();
             });
-            extractedText.replace(/\r\n/g, '\n')
-                .replace(/\n+/g, '')
-                .trim()
-                .replace(/\s+/g, ' ')
+            extractedText = extractedText.replace(/\r\n/g, '\n').replace(/\n+/g, '\n').trim()
             console.log(extractedText);
             texts.push(extractedText);
         } catch (error) {
-            console.error(`Lỗi khi trích xuất từ URL ${url}:`, error);
+            console.error(`Lỗi khi trích xuất từ URL`, error);
             texts.push("");
         } finally {
             // await page.close();
