@@ -8,6 +8,10 @@ WORKDIR /usr/src/app
 # Sao chép package.json và package-lock.json
 COPY package*.json ./
 
+# Tạo người dùng không phải root để tránh chạy làm root
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN chown -R appuser:appgroup /usr/src/app
+USER appuser
 
 # Cài đặt các phụ thuộc từ package.json
 RUN npm install --force

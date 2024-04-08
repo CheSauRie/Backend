@@ -220,6 +220,7 @@ async function extractTextFromUrls(urls) {
                 .replace(/\n+/g, '')
                 .trim()
                 .replace(/\s+/g, ' ')
+            console.log(extractedText);
             texts.push(extractedText);
         } catch (error) {
             console.error(`Lỗi khi trích xuất từ URL ${url}:`, error);
