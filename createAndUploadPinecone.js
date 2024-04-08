@@ -67,43 +67,20 @@ const updatePinecone = async (client, indexName, docs) => {
 // 10. Run the main async function
 (async () => {
 
-    const loader = new DirectoryLoader("./documents", {
-        ".txt": (path) => new TextLoader(path),
-        ".pdf": (path) => new PDFLoader(path),
-    });
-    const docs = await loader.load();
-
     const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
     const pineconeIndex = pinecone.Index("kltn");
 
-    // const docs = [
-    //     new Document({
-    //         metadata: { foo: "bar" },
-    //         pageContent: "pinecone is a vector db",
-    //     }),
-    //     new Document({
-    //         metadata: { foo: "bar" },
-    //         pageContent: "the quick brown fox jumped over the lazy dog",
-    //     }),
-    //     new Document({
-    //         metadata: { baz: "qux" },
-    //         pageContent: "lorem ipsum dolor sit amet",
-    //     }),
-    //     new Document({
-    //         metadata: { baz: "qux" },
-    //         pageContent: "pinecones are the woody fruiting body and of a pine tree",
-    //     }),
-    // ];
     const splitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 700,
-        chunkOverlap: 90,
-        separators: ['\n\n', '\n', ' ', ''] //có thể là dấu ##
+        chunkSize: 3000,
+        chunkOverlap: 600,
+        // separators: ['\n\n', '\n', ' ', '', "========"]
     });
-    const text = await fs.readFile('E:\\KLTN-Backend-deploy\\Backend\\documents\\data_cleaned.txt', 'utf8');
+
+    const text = await fs.readFile('E:\\KLTN-Backend-deploy\\Backend\\document\\data_cleaned.txt', 'utf8');
     const output = await splitter.createDocuments([text])
 
-    await PineconeStore.fromDocuments(output, new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY }), {
+    await PineconeStore.fromDocuments(output, new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY, stripNewLines: false }), {
         pineconeIndex,
         maxConcurrency: 5, // Maximum number of batch requests to allow at once. Each batch is 1000 vectors.
     });
@@ -113,6 +90,54 @@ const updatePinecone = async (client, indexName, docs) => {
     //     { pineconeIndex }
     // );
 
-    /* Search the vector DB independently with metadata filters */
-    // const results = await vectorStore.similaritySearch("đại học quốc gia hồ chí minh", 4);
 })();
+
+// function splitTextIntoChunks(text, maxSize) {
+//     const chunks = [];
+//     for (let start = 0; start < text.length; start += maxSize) {
+//         const end = Math.min(start + maxSize, text.length);
+//         chunks.push(text.substring(start, end));
+//     }
+//     return chunks;
+// }
+// (async () => {
+//     const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+//     const pineconeIndex = pinecone.Index("kltn");
+
+//     const directoryPath = "./documents";
+//     let files = await fs.readdir(directoryPath);
+
+//     files = files.filter(file => path.extname(file) === '.txt').sort((a, b) => {
+//         return parseInt(a, 10) - parseInt(b, 10);
+//     });
+
+//     for (const file of files) {
+//         try {
+//             const filePath = path.join(directoryPath, file);
+//             console.log(`Processing file: ${file}`);
+
+//             const content = await fs.readFile(filePath, 'utf8');
+//             const lines = content.split('\n');
+//             const chunkSize = parseInt(lines.shift(), 10);
+//             const text = lines.join('\n');
+
+//             // Chia nhỏ văn bản thành các chunks nếu cần
+//             const chunks = (chunkSize > 8192) ? splitTextIntoChunks(text, 8192) : [text];
+
+//             for (const chunk of chunks) {
+//                 const documents = await new RecursiveCharacterTextSplitter({
+//                     chunkSize: chunk.length, // Sử dụng độ dài của mỗi chunk như là chunkSize
+//                     separators: ['\n\n', '\n', ' ', '']
+//                 }).createDocuments([chunk]);
+
+//                 // Thực hiện embedding và upload cho mỗi chunk
+//                 await PineconeStore.fromDocuments(documents, new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY, modelName: "text-embedding-ada-002", stripNewLines: false }), {
+//                     pineconeIndex,
+//                     maxConcurrency: 5,
+//                 });
+//             }
+//         } catch (error) {
+//             console.error(`Error processing file: ${file}. Error: ${error.message}`);
+//         }
+//     }
+// })();
