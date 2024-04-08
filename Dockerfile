@@ -26,7 +26,7 @@ RUN chown -R appuser:appgroup /usr/src/app
 USER appuser
 
 # Cài đặt các phụ thuộc từ package.json
-RUN npm install
+RUN npm install --force
 
 # RUN npm install -g @babel/core @babel/cli @babel/register
 # Sao chép phần còn lại của mã nguồn ứng dụng
