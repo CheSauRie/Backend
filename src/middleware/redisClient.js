@@ -1,12 +1,12 @@
 require('dotenv').config(); // Đảm bảo dòng này ở đầu file
-const redis = require('redis');
+const { createClient } = require('redis');
 
-// Sử dụng biến môi trường
-const client = redis.createClient({
-    url: process.env.REDIS_URL // Sử dụng biến môi trường
+const client = createClient({
+    password: '9ulgOuDzsueFBV6GwZcODEJEEAJjLsr3',
+    socket: {
+        host: 'redis-13848.c16.us-east-1-2.ec2.redns.redis-cloud.com',
+        port: 13848
+    }
 });
-
-client.on('error', (err) => console.log('Redis Client Error', err));
-client.connect();
 
 module.exports = client;

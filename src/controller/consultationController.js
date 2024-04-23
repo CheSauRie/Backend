@@ -161,7 +161,7 @@ const getConsultationsByUserId = async (req, res) => {
     const { id } = req.user
     try {
         const consultations = await Consultation_requests.findAll({
-            where: { user_id: 6 },
+            where: { user_id: id },
             include: [
                 {
                     model: Consultation_schedules,
