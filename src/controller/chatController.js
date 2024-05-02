@@ -128,14 +128,14 @@ const createMessage = async (req, res) => {
                     AI: ${msg.answer}`
         })
         // Tìm kiếm thông tin từ Google để sử dụng làm phần của câu trả lời, đưa vào câu trả lời
-        const googleSearchResults = await googleSearch(question, 2);
+        // const googleSearchResults = await googleSearch(question, 2);
 
         // Tạo Answer từ hàm response AI, kết hợp với kết quả tìm kiếm Google
-        const aiResponse = await responseAI(question, convHistory, googleSearchResults);
+        const aiResponse = await responseAI(question, convHistory);
         // Tạo Answer
-        const answer = `${aiResponse}\n\n[Nguồn tham khảo:] \n${googleSearchResults}`;
+        const answer = `${aiResponse}\n\n[Nguồn tham khảo:]`;
 
-        const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary, url_references: googleSearchResults });
+        const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary });
         res.status(201).json(newMessage);
     } catch (error) {
         console.log(error);
@@ -186,7 +186,7 @@ const combineDocuments = (docs) => {
 //Tạo phản hồi AI
 const responseAI = async (question, convHistory) => {
     try {
-        const retriever = await createRetrieval()
+        // const retriever = await createRetrieval()
         const context = await queryText(question)
         const standaloneQuestionTemplate = `Given some conversation history (if any) and a question.
         conversation history: {conv_history}
@@ -217,10 +217,10 @@ const responseAI = async (question, convHistory) => {
         //     combineDocuments
         // ])
 
-        const standaloneQuestion = await standaloneQuestionChain.invoke({
-            question: question,
-            conv_history: convHistory,
-        })
+        // const standaloneQuestion = await standaloneQuestionChain.invoke({
+        //     question: question,
+        //     conv_history: convHistory,
+        // })
 
         // console.log(standaloneQuestion);
 
