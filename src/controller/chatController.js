@@ -131,10 +131,11 @@ const createMessage = async (req, res) => {
         // const googleSearchResults = await googleSearch(question, 2);
 
         // Tạo Answer từ hàm response AI, kết hợp với kết quả tìm kiếm Google
-        const aiResponse = await responseAI(question, convHistory);
+        // const aiResponse = await responseAI(question, convHistory);
         // Tạo Answer
-        const answer = `${aiResponse}\n\n[Nguồn tham khảo:]`;
-
+        const aiResponse = await queryText(question, convHistory);
+        const answer = `${aiResponse}`;
+        console.log(convHistory);
         const newMessage = await Message.create({ chat_id: chat_id, question: question, answer: answer, summary: summary });
         res.status(201).json(newMessage);
     } catch (error) {
@@ -143,9 +144,12 @@ const createMessage = async (req, res) => {
     }
 }
 
-const queryText = async (text) => {
-    const url = 'https://positive-bullfrog-precisely.ngrok-free.app/query/';
-    const data = { text };
+const queryText = async (text, conversations) => {
+    const url = 'https://positive-bullfrog-precisely.ngrok-free.app/chat/';
+    const data = {
+        text: text,
+        conversations: conversations // This is the new part where you send the conversations
+    };
 
     try {
         const response = await axios.post(url, data, {
@@ -211,18 +215,6 @@ const responseAI = async (question, convHistory) => {
         const standaloneQuestionPrompt = PromptTemplate.fromTemplate(standaloneQuestionTemplate)
         const standaloneQuestionChain = standaloneQuestionPrompt.pipe(llm).pipe(new StringOutputParser)
         const answerChain = answerPrompt.pipe(llm).pipe(new StringOutputParser)
-        // const retrieverChain = RunnableSequence.from([
-        //     prevResult => prevResult.standalone_question,
-        //     retriever,
-        //     combineDocuments
-        // ])
-
-        // const standaloneQuestion = await standaloneQuestionChain.invoke({
-        //     question: question,
-        //     conv_history: convHistory,
-        // })
-
-        // console.log(standaloneQuestion);
 
         const chain = RunnableSequence.from([
             {
@@ -242,7 +234,7 @@ const responseAI = async (question, convHistory) => {
             conv_history: convHistory,
             context: context
         })
-        // console.log(context);
+        console.log(context);
         return response;
     } catch (error) {
         console.log(error);
