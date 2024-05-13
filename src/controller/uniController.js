@@ -101,12 +101,6 @@ const getUniversityImages = async (req, res) => {
 // Chi tiết university
 const getUniversityDetail = async (req, res) => {
     try {
-
-        // const cacheUniversities = await client.get('universityDetail');
-        // if (cacheUniversities) {
-        //     console.log("da cahce");
-        //     return res.json({ universityDetail: JSON.parse(cacheUniversities) });
-        // }
         const { uni_code } = req.params;
         const university = await University.findOne({
             where: { uni_code },
@@ -131,9 +125,6 @@ const getUniversityDetail = async (req, res) => {
             universityDetail[key] = replaceEscapedNewlines(universityDetail[key]);
         }
 
-        // await client.set('universityDetail', JSON.stringify(universityDetail), {
-        //     EX: 3600, // Thời gian sống của cache (ví dụ: 3600 giây = 1 giờ)
-        // });
         res.status(200).json(universityDetail);
     } catch (error) {
         console.error('Error fetching university detail:', error);
@@ -168,7 +159,6 @@ const getUniversitiesByAddress = async (req, res) => {
 const getUniversitiesByMajor = async (req, res) => {
     const { majorName } = req.body;
     try {
-        // Tìm các trường đại học liên quan đến ngành
         const universities = await University.findAll({
             include: [{
                 model: Major,
@@ -181,7 +171,7 @@ const getUniversitiesByMajor = async (req, res) => {
         });
 
         if (universities.length > 0) {
-            res.json({ universities });
+            res.status(200).json({ universities });
         } else {
             res.status(404).json({ message: 'No universities found for the specified major.' });
         }
@@ -190,6 +180,7 @@ const getUniversitiesByMajor = async (req, res) => {
         res.status(500).json({ message: 'Error fetching universities by major', error: error.message });
     }
 };
+
 module.exports = {
     createUniversity,
     getUniversities,
