@@ -145,7 +145,7 @@ const createMessage = async (req, res) => {
 }
 
 const queryText = async (text, conversations) => {
-    const url = 'https://positive-bullfrog-precisely.ngrok-free.app/chat/';
+    const url = process.env.CHATBOT_URL;
     const data = {
         text: text,
         conversations: conversations // This is the new part where you send the conversations
